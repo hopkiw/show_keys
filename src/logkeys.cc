@@ -26,6 +26,11 @@
 #include <sys/socket.h>
 #include <linux/input.h>
 
+#include <X11/Xlib.h>
+#include <X11/Xutil.h>
+
+#include <xosd.h>
+
 #ifdef HAVE_CONFIG_H
 # include <config.h>  // include config produced from ./configure
 #endif
@@ -583,6 +588,104 @@ int log_event(FILE *out)
 }
 
 
+// Writes event to screen
+int show_event(xosd *osd)
+{
+  unsigned short scan_code = key_state.event.code;
+  char out[20];
+
+  if (!key_state.scancode_ok) {  // keycode out of range, log error
+    sprintf(out, "<E-%x>", scan_code);
+    xosd_display (osd, 0, XOSD_string, out);
+    return 0;
+  }
+
+  if (key_state.repeats) {
+    if (key_state.repeat_end) {
+      if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't log function keys, then don't log repeat either
+      else {
+        sprintf(out, "<#+%d>", key_state.repeats);
+      }
+    }
+    xosd_display (osd, 0, XOSD_string, out);
+    return 0;
+  }
+
+  // on key press
+  if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D)) || args.timestamp_every) {
+      // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
+    if (key_state.ctrl_in_effect)
+      sprintf(out, "%lc", char_keys[to_char_keys_index(scan_code)]);  // log C or D
+  }
+  if (is_char_key(scan_code)) {
+    // print character or string corresponding to received keycode; only print chars when not \0
+    if (key_state.key != L'\0') {
+      sprintf(out, "%lc", key_state.key);  // write character to log file
+    }
+  }
+  else if (is_func_key(scan_code)) {
+    if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only log function keys if --no-func-keys not requested
+      sprintf(out, "%ls", func_keys[to_func_keys_index(scan_code)]);
+    }
+    else if (scan_code == KEY_SPACE || scan_code == KEY_TAB) {
+      sprintf(out, " ");  // but always log a single space for Space and Tab keys
+    }
+  } else {
+    sprintf(out, "<E-%x>", scan_code);  // keycode is neither of character nor function, log error
+  }
+
+  xosd_display (osd, 0, XOSD_string, out);
+  return 0;
+}
+
+/*
+int show_event2()
+{
+  unsigned short scan_code = key_state.event.code;
+
+  if (!key_state.scancode_ok) {  // keycode out of range, log error
+    printf("<E-%x>", scan_code);
+    return 0;
+  }
+
+  if (key_state.repeats) {
+    if (key_state.repeat_end) {
+      if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't log function keys, then don't log repeat either
+      else {
+        printf("<#+%d>", key_state.repeats);
+      }
+    }
+    return 0;
+  }
+
+  // on key press
+  if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D)) || args.timestamp_every) {
+      // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
+    if (key_state.ctrl_in_effect)
+      printf("%lc", char_keys[to_char_keys_index(scan_code)]);  // log C or D
+  }
+  if (is_char_key(scan_code)) {
+    // print character or string corresponding to received keycode; only print chars when not \0
+    if (key_state.key != L'\0') {
+      printf("%lc", key_state.key);  // write character to log file
+    }
+  }
+  else if (is_func_key(scan_code)) {
+    if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only log function keys if --no-func-keys not requested
+      printf("%ls", func_keys[to_func_keys_index(scan_code)]);
+    }
+    else if (scan_code == KEY_SPACE || scan_code == KEY_TAB) {
+      printf(" ");  // but always log a single space for Space and Tab keys
+    }
+  } else {
+    printf("<E-%x>", scan_code);  // keycode is neither of character nor function, log error
+  }
+
+  return 0;
+}
+*/
+
+
 void post_log(FILE *out)
 {
   fclose(out);
@@ -614,9 +717,28 @@ void post_log(FILE *out)
 }
 
 
+xosd *create_my_osd() {
+     xosd *osd;
+     osd = xosd_create (1);
+
+     xosd_set_font(osd, "-xos4-Terminus-Bold-R-Normal--32-320-72-72-C-160-ISO8859-1");
+     xosd_set_colour(osd, "purple");
+     xosd_set_pos(osd, XOSD_bottom);
+     xosd_set_vertical_offset(osd, 30);
+     xosd_set_align(osd, XOSD_right);
+     xosd_set_horizontal_offset(osd, 30);
+     xosd_set_timeout(osd, 1);
+     xosd_set_shadow_offset(osd, 3);
+
+     xosd_display (osd, 0, XOSD_string, "Starting up!");
+
+     return osd;
+}
+
 // returns output file in case a new one was created so caller can close it properly
 void log_loop()
 {
+  /*
   char timestamp[32];  // timestamp string, long enough to hold format "\n%F %T%z > "
   FILE *out = open_log_file();
 
@@ -633,31 +755,39 @@ void log_loop()
   else
     file_size += fprintf(out, "Logging started ...\n\n%s", timestamp);
   fflush(out);
+  */
 
   // infinite loop: exit gracefully by receiving SIGHUP, SIGINT or SIGTERM (of which handler closes input_fd)
+  xosd *osd = create_my_osd();
   while (update_key_state()) {
-    int inc_size = log_event(out);
-    if (inc_size > 0) file_size += inc_size;
+    //int inc_size = log_event(out);
+    //if (inc_size > 0) file_size += inc_size;
+    //show_event(osd);
+    show_event(osd);
 
     // if remote posting is enabled and size threshold is reached
+    /*
     if (args.post_size != 0 && file_size >= args.post_size && stat(UPLOADER_PID_FILE, &st) == -1) {
       post_log(out);
       return log_loop();
     }
+    */
   }
+  //xosd_wait_until_no_display(osd);
 
   // append final timestamp, close files and exit
+  /*
   time(&cur_time);
   strftime(timestamp, sizeof(timestamp), "%F %T%z", localtime(&cur_time));
   fprintf(out, "\n\nLogging stopped at %s\n\n", timestamp);
   fclose(out);
+  */
 }
 
 
 int main(int argc, char **argv)
 {  
   on_exit(exit_cleanup, NULL);
-  
 
   args.logfile = (char*) DEFAULT_LOG_FILE;  // default log file will be used if none specified
   
