@@ -30,9 +30,7 @@ void process_command_line_arguments(int argc, char **argv)
     {"help",      no_argument,       0, '?'},
     {"export-keymap", required_argument, &flags, FLAG_EXPORT_KEYMAP},
     {"no-func-keys",  no_argument,       &flags, FLAG_NO_FUNC_KEYS},
-    {"no-timestamps", no_argument,       &flags, FLAG_NO_TIMESTAMPS},
     {"no-daemon",     no_argument,       &flags, FLAG_NO_DAEMON},
-    {"timestamp-every", no_argument,     &flags, FLAG_TIMESTAMP_EVERY},
     {0}
   };
   

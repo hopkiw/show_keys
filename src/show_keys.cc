@@ -57,8 +57,6 @@
 
 namespace show_keys {
 
-#define TIME_FORMAT "%F %T%z > "  // results in YYYY-mm-dd HH:MM:SS+ZZZZ
-
 struct key_state_t {
   wchar_t key;
   unsigned int repeats;  // count_repeats differs from the actual number of repeated characters! afaik, only the OS knows how these two values are related (by respecting configured repeat speed and delay)
@@ -528,7 +526,7 @@ int show_event(xosd *osd)
   }
 
   // on key press
-  if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D)) || args.timestamp_every) {
+  if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D))) {
       // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
     if (key_state.ctrl_in_effect)
       sprintf(out, "%lc", char_keys[to_char_keys_index(scan_code)]);  // display C or D
@@ -545,6 +543,7 @@ int show_event(xosd *osd)
     }
     else if (scan_code == KEY_SPACE) {
       sprintf(out, "␣");  // but always display a single space for Space and Tab keys
+    }
     else if (scan_code == KEY_TAB) {
       sprintf(out, "⇥");  // but always display a single space for Space and Tab keys
     }

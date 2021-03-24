@@ -2,8 +2,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ(2.64)
-AC_INIT([logkeys], m4_esyscmd_s([head -n1 ./ChangeLog | grep -Po '(?<=v)[0-9\.a-z]+' || echo '?.?.?']),[kerncece+logkeys@gmail.com],[],[https://github.com/kernc/logkeys/])
-AC_CONFIG_SRCDIR([src/logkeys.cc])
+AC_INIT([show_keys], 1.0)
+AC_CONFIG_SRCDIR([src/show_keys.cc])
 AM_INIT_AUTOMAKE([-Wall foreign])
 AC_CONFIG_HEADERS([config.h])
 
@@ -55,7 +55,7 @@ AC_CHECK_FILE(
 # Checks for header files.
 
 AC_CHECK_HEADERS(
-  [cstdio cerrno cwchar cstring cassert sstream cstdlib csignal error.h unistd.h getopt.h sys/file.h sys/stat.h linux/input.h], 
+  [cstdio cerrno cwchar cstring cassert sstream cstdlib csignal error.h unistd.h getopt.h sys/file.h sys/stat.h linux/input.h xosd.h], 
   [],
   [AC_MSG_ERROR([Expected header file is missing!])]
 )
@@ -77,5 +77,7 @@ AC_CHECK_FUNCS(
   [AC_MSG_ERROR([Expected function is missing!])]
 )
 
-AC_CONFIG_FILES([Makefile src/Makefile man/Makefile scripts/Makefile])
+AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
+
+#[geteuid error error_at_line exit on_exit memset setlocale strerror fprintf getopt_long fopen sscanf fscanf getpid getuid getgid fclose remove kill strlen strcat strcpy strncat freopen feof fgets atoi sigaction fork setsid open close flock write umask setegid seteuid strftime localtime fflush read time fgetws wcslen swscanf wcscpy popen pclose xosd_create xosd_display xosd_set_align xosd_set_colour xosd_set_font xosd_set_horizontal_offset xosd_set_pos xosd_set_shadow_offset xosd_set_timeout xosd_set_vertical_offset xosd_wait_until_no_display],
