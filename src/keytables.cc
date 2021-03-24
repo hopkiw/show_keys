@@ -1,18 +1,10 @@
-/*
-  Copyleft (ɔ) 2009 Kernc
-  This program is free software. It comes with absolutely no warranty whatsoever.
-  See COPYING for further information.
-  
-  Project homepage: https://github.com/kernc/logkeys
-*/
-
 #ifndef _KEYTABLES_H_
 #define _KEYTABLES_H_
 
 #include <cassert>
 #include <linux/input.h>
 
-namespace logkeys {
+namespace show_keys {
 
 // these are ordered default US keymap keys
 wchar_t char_keys[49] =  L"1234567890-=qwertyuiop[]asdfghjkl;'`\\zxcvbnm,./<";
@@ -97,6 +89,6 @@ inline int to_func_keys_index(unsigned int keycode)
   return -1;  // not function key keycode
 }
 
-} // namespace logkeys
+} // namespace show_keys
 
 #endif  // _KEYTABLES_H_

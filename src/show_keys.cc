@@ -1,11 +1,3 @@
-/*
-  Copyleft (ɔ) 2009 Kernc
-  This program is free software. It comes with absolutely no warranty whatsoever.
-  See COPYING for further information.
-  
-  Project homepage: https://github.com/kernc/logkeys
-*/
-
 #include <algorithm>
 #include <cstdio>
 #include <cerrno>
@@ -57,15 +49,13 @@
 #define COMMAND_STR_CAPSLOCK_STATE ("{ { xset q 2>/dev/null | grep -q -E 'Caps Lock: +on'; } || { setleds 2>/dev/null | grep -q 'CapsLock on'; }; } && echo on")
 
 #define INPUT_EVENT_PATH  "/dev/input/"  // standard path
-#define DEFAULT_LOG_FILE  "/var/log/logkeys.log"
-#define PID_FILE          "/var/run/logkeys.pid"
+#define PID_FILE          "/var/run/show_keys.pid"
 
 #include "usage.cc"      // usage() function
 #include "args.cc"       // global arguments struct and arguments parsing
 #include "keytables.cc"  // character and function key tables and helper functions
-#include "upload.cc"     // functions concerning remote uploading of log file
 
-namespace logkeys {
+namespace show_keys {
 
 #define TIME_FORMAT "%F %T%z > "  // results in YYYY-mm-dd HH:MM:SS+ZZZZ
 
@@ -514,87 +504,13 @@ bool update_key_state()
   return true;
 }
 
-
-FILE* open_log_file()
-{
-  // open log file (if file doesn't exist, create it with safe 0600 permissions)
-  umask(0177);
-  FILE *out = NULL;
-  if (args.logfile == "-") {
-    out = stdout;
-  }
-  else {
-    out = fopen(args.logfile.c_str(), "a");
-  }
-  if (!out)
-    error(EXIT_FAILURE, errno, "Error opening output file '%s'", args.logfile.c_str());
-  return out;
-}
-
-
-// Writes event to log file and returns the increased file size
-int log_event(FILE *out)
-{
-  int inc_size = 0;
-  unsigned short scan_code = key_state.event.code;
-  char timestamp[32];  // timestamp string, long enough to hold format "\n%F %T%z > "
-
-  if (!key_state.scancode_ok) {  // keycode out of range, log error
-    inc_size += fprintf(out, "<E-%x>", scan_code);
-    return inc_size;
-  }
-
-  if (key_state.repeats) {
-    if (key_state.repeat_end) {
-      if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't log function keys, then don't log repeat either
-      else {
-        inc_size += fprintf(out, "<#+%d>", key_state.repeats);
-        fflush(out);
-      }
-    }
-    return inc_size;
-  }
-
-  // on key press
-  if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER ||
-      (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D)) ||
-      args.timestamp_every) {
-      // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
-    if (key_state.ctrl_in_effect)
-      inc_size += fprintf(out, "%lc", char_keys[to_char_keys_index(scan_code)]);  // log C or D
-    if (args.flags & FLAG_NO_TIMESTAMPS)
-      inc_size += fprintf(out, "\n");
-    else {
-      strftime(timestamp, sizeof(timestamp), "\n" TIME_FORMAT, localtime(&key_state.event.time.tv_sec));
-      inc_size += fprintf(out, "%s", timestamp);  // then newline and timestamp
-    }
-  }
-  if (is_char_key(scan_code)) {
-    // print character or string corresponding to received keycode; only print chars when not \0
-    if (key_state.key != L'\0') inc_size += fprintf(out, "%lc", key_state.key);  // write character to log file
-  }
-  else if (is_func_key(scan_code)) {
-    if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only log function keys if --no-func-keys not requested
-      inc_size += fprintf(out, "%ls", func_keys[to_func_keys_index(scan_code)]);
-    }
-    else if (scan_code == KEY_SPACE || scan_code == KEY_TAB) {
-      inc_size += fprintf(out, " ");  // but always log a single space for Space and Tab keys
-    }
-  }
-  else inc_size += fprintf(out, "<E-%x>", scan_code);  // keycode is neither of character nor function, log error
-
-  fflush(out);
-  return inc_size;
-}
-
-
 // Writes event to screen
 int show_event(xosd *osd)
 {
   unsigned short scan_code = key_state.event.code;
   char out[20];
 
-  if (!key_state.scancode_ok) {  // keycode out of range, log error
+  if (!key_state.scancode_ok) {  // keycode out of range, display in error format
     sprintf(out, "<E-%x>", scan_code);
     xosd_display (osd, 0, XOSD_string, out);
     return 0;
@@ -602,7 +518,7 @@ int show_event(xosd *osd)
 
   if (key_state.repeats) {
     if (key_state.repeat_end) {
-      if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't log function keys, then don't log repeat either
+      if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't display function keys, then don't display repeat either
       else {
         sprintf(out, "<#+%d>", key_state.repeats);
       }
@@ -615,109 +531,33 @@ int show_event(xosd *osd)
   if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D)) || args.timestamp_every) {
       // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
     if (key_state.ctrl_in_effect)
-      sprintf(out, "%lc", char_keys[to_char_keys_index(scan_code)]);  // log C or D
+      sprintf(out, "%lc", char_keys[to_char_keys_index(scan_code)]);  // display C or D
   }
   if (is_char_key(scan_code)) {
     // print character or string corresponding to received keycode; only print chars when not \0
     if (key_state.key != L'\0') {
-      sprintf(out, "%lc", key_state.key);  // write character to log file
+      sprintf(out, "%lc", key_state.key);
     }
   }
   else if (is_func_key(scan_code)) {
-    if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only log function keys if --no-func-keys not requested
+    if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only display function keys if --no-func-keys not requested
       sprintf(out, "%ls", func_keys[to_func_keys_index(scan_code)]);
     }
-    else if (scan_code == KEY_SPACE || scan_code == KEY_TAB) {
-      sprintf(out, " ");  // but always log a single space for Space and Tab keys
+    else if (scan_code == KEY_SPACE) {
+      sprintf(out, "␣");  // but always display a single space for Space and Tab keys
+    else if (scan_code == KEY_TAB) {
+      sprintf(out, "⇥");  // but always display a single space for Space and Tab keys
     }
   } else {
-    sprintf(out, "<E-%x>", scan_code);  // keycode is neither of character nor function, log error
+    sprintf(out, "<E-%x>", scan_code);  // keycode is neither of character nor function, display in error format
   }
 
   xosd_display (osd, 0, XOSD_string, out);
   return 0;
 }
 
-/*
-int show_event2()
+xosd *create_my_osd()
 {
-  unsigned short scan_code = key_state.event.code;
-
-  if (!key_state.scancode_ok) {  // keycode out of range, log error
-    printf("<E-%x>", scan_code);
-    return 0;
-  }
-
-  if (key_state.repeats) {
-    if (key_state.repeat_end) {
-      if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't log function keys, then don't log repeat either
-      else {
-        printf("<#+%d>", key_state.repeats);
-      }
-    }
-    return 0;
-  }
-
-  // on key press
-  if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D)) || args.timestamp_every) {
-      // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
-    if (key_state.ctrl_in_effect)
-      printf("%lc", char_keys[to_char_keys_index(scan_code)]);  // log C or D
-  }
-  if (is_char_key(scan_code)) {
-    // print character or string corresponding to received keycode; only print chars when not \0
-    if (key_state.key != L'\0') {
-      printf("%lc", key_state.key);  // write character to log file
-    }
-  }
-  else if (is_func_key(scan_code)) {
-    if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only log function keys if --no-func-keys not requested
-      printf("%ls", func_keys[to_func_keys_index(scan_code)]);
-    }
-    else if (scan_code == KEY_SPACE || scan_code == KEY_TAB) {
-      printf(" ");  // but always log a single space for Space and Tab keys
-    }
-  } else {
-    printf("<E-%x>", scan_code);  // keycode is neither of character nor function, log error
-  }
-
-  return 0;
-}
-*/
-
-
-void post_log(FILE *out)
-{
-  fclose(out);
-
-  std::stringstream ss;
-  for (int i = 1;; ++i) {
-    ss.clear();
-    ss.str("");
-    ss << args.logfile << "." << i;
-    struct stat st;
-    if (stat(ss.str().c_str(), &st) == -1) break;  // file .log.i doesn't yet exist
-  }
-
-  if (rename(args.logfile.c_str(), ss.str().c_str()) == -1)  // move current log file to indexed
-    error(EXIT_FAILURE, errno, "Error renaming logfile");
-
-  out = fopen(args.logfile.c_str(), "a");  // open empty log file with the same name
-  if (!out)
-    error(EXIT_FAILURE, errno, "Error opening output file '%s'", args.logfile.c_str());
-
-  if (!args.http_url.empty() || !args.irc_server.empty()) {
-    switch (fork()) {
-    case -1: error(0, errno, "Error while forking remote-posting process");
-    case 0:
-      start_remote_upload();  // child process will upload the .log.i files
-      exit(EXIT_SUCCESS);
-    }
-  }
-}
-
-
-xosd *create_my_osd() {
      xosd *osd;
      osd = xosd_create (1);
 
@@ -735,53 +575,15 @@ xosd *create_my_osd() {
      return osd;
 }
 
-// returns output file in case a new one was created so caller can close it properly
 void log_loop()
 {
-  /*
-  char timestamp[32];  // timestamp string, long enough to hold format "\n%F %T%z > "
-  FILE *out = open_log_file();
-
-  struct stat st;
-  stat(args.logfile.c_str(), &st);
-  off_t file_size = st.st_size;  // log file is currently file_size bytes "big"
-
-  time_t cur_time;
-  time(&cur_time);
-  strftime(timestamp, sizeof(timestamp), TIME_FORMAT, localtime(&cur_time));
-
-  if (args.flags & FLAG_NO_TIMESTAMPS)
-    file_size += fprintf(out, "Logging started at %s\n\n", timestamp);
-  else
-    file_size += fprintf(out, "Logging started ...\n\n%s", timestamp);
-  fflush(out);
-  */
-
   // infinite loop: exit gracefully by receiving SIGHUP, SIGINT or SIGTERM (of which handler closes input_fd)
   xosd *osd = create_my_osd();
   while (update_key_state()) {
-    //int inc_size = log_event(out);
-    //if (inc_size > 0) file_size += inc_size;
-    //show_event(osd);
     show_event(osd);
-
-    // if remote posting is enabled and size threshold is reached
-    /*
-    if (args.post_size != 0 && file_size >= args.post_size && stat(UPLOADER_PID_FILE, &st) == -1) {
-      post_log(out);
-      return log_loop();
-    }
-    */
   }
-  //xosd_wait_until_no_display(osd);
+  xosd_wait_until_no_display(osd);
 
-  // append final timestamp, close files and exit
-  /*
-  time(&cur_time);
-  strftime(timestamp, sizeof(timestamp), "%F %T%z", localtime(&cur_time));
-  fprintf(out, "\n\nLogging stopped at %s\n\n", timestamp);
-  fclose(out);
-  */
 }
 
 
@@ -789,32 +591,19 @@ int main(int argc, char **argv)
 {  
   on_exit(exit_cleanup, NULL);
 
-  args.logfile = (char*) DEFAULT_LOG_FILE;  // default log file will be used if none specified
-  
   process_command_line_arguments(argc, argv);
-  
-  if (geteuid()) error(EXIT_FAILURE, errno, "Got r00t?");
-  // kill existing logkeys process
+ 
+  // No, let's assume the user can figure out permission issues.
+  //if (geteuid()) error(EXIT_FAILURE, errno, "Got r00t?");
+
+  // kill existing process
   if (args.kill) kill_existing_process();
-  
-  // if neither start nor export, that must be an error
-  if (!args.start && !(args.flags & FLAG_EXPORT_KEYMAP)) { usage(); exit(EXIT_FAILURE); }
-  
-  // if posting remote and post_size not set, set post_size to default [500K bytes]
-  if (args.post_size == 0 && (!args.http_url.empty() || !args.irc_server.empty())) {
-    args.post_size = 500000;
-  }
   
   // check for incompatible flags
   if (!args.keymap.empty() && (!(args.flags & FLAG_EXPORT_KEYMAP) && args.us_keymap)) {  // exporting uses args.keymap also
     error(EXIT_FAILURE, 0, "Incompatible flags '-m' and '-u'. See usage.");
   }
 
-  // check for incompatible flags: if posting remote and output is set to stdout
-  if (args.post_size != 0 && ( args.logfile == "-" )) {
-    error(EXIT_FAILURE, 0, "Incompatible flags [--post-size | --post-http] and --output to stdout");
-  }
-  
   set_utf8_locale();
   
   if (args.flags & FLAG_EXPORT_KEYMAP) {
@@ -840,9 +629,7 @@ int main(int argc, char **argv)
   
   close(STDIN_FILENO);
   // leave stderr open
-  if (args.logfile != "-") {
-    close(STDOUT_FILENO);
-  }
+  close(STDOUT_FILENO);
   
   // open input device for reading
   input_fd = open(args.device.c_str(), O_RDONLY);
@@ -850,12 +637,6 @@ int main(int argc, char **argv)
     error(EXIT_FAILURE, errno, "Error opening input event device '%s'", args.device.c_str());
   }
   
-  // if log file is other than default, then better seteuid() to the getuid() in order to ensure user can't write to where she shouldn't!
-  if (args.logfile == DEFAULT_LOG_FILE) {
-    seteuid(getuid());
-    setegid(getgid());
-  }
-
   if (access(PID_FILE, F_OK) != -1)  // PID file already exists
     error(EXIT_FAILURE, errno, "Another process already running? Quitting. (" PID_FILE ")");
 
@@ -884,9 +665,9 @@ int main(int argc, char **argv)
   exit(EXIT_SUCCESS);
 } // main()
 
-} // namespace logkeys
+} // namespace show_keys
 
 int main(int argc, char** argv)
 {
-  return logkeys::main(argc, argv);
+  return show_keys::main(argc, argv);
 }
