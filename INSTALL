@@ -1,11 +1,5 @@
-logkeys keylogger - installation instructions
+show_keys - installation instructions
 =============================================
-
-Provided your GNU/Linux distribution doesn't include logkeys package
-in its repositories, manual installation of logkeys from source is as
-easy as cloning this repo or downloading a zip of the
-source (<https://github.com/kernc/logkeys/archive/master.zip>),
-unzipping, configuring, and building.
 
 Prerequisites
 -------------
@@ -28,9 +22,6 @@ You need some tools to build the code from source:
 Build and Install
 -----------------
 
-    $ unzip logkeys-master.zip     # or use git clone
-    $ cd logkeys-master
-
     $ ./autogen.sh     # generate files for build
     $ cd build         # keeps the root and src dirs clean
     $ ../configure
@@ -39,7 +30,7 @@ Build and Install
     $ su               # get root to install in system
     $ make install     # installs binaries, manuals and scripts
 
-To uninstall logkeys, remove accompanying scripts and manuals:
+To uninstall show_keys, remove accompanying scripts and manuals:
 
     $ make uninstall    # in the same build dir
 
