@@ -514,6 +514,11 @@ int show_event(xosd *osd)
     return 0;
   }
 
+  if (scan_code == KEY_SPACE) {
+    sprintf(out, "<Space>", scan_code);
+    xosd_display(osd, 0, XOSD_string, out);
+  }
+
   if (key_state.repeats) {
     if (key_state.repeat_end) {
       if ((args.flags & FLAG_NO_FUNC_KEYS) && is_func_key(key_state.event.code));  // if repeated was function key, and if we don't display function keys, then don't display repeat either
@@ -527,25 +532,19 @@ int show_event(xosd *osd)
 
   // on key press
   if (scan_code == KEY_ENTER || scan_code == KEY_KPENTER || (key_state.ctrl_in_effect && (scan_code == KEY_C || scan_code == KEY_D))) {
-      // on ENTER key or Ctrl+C/Ctrl+D event append timestamp
-    if (key_state.ctrl_in_effect)
+    if (key_state.ctrl_in_effect) {
       sprintf(out, "%lc", char_keys[to_char_keys_index(scan_code)]);  // display C or D
+    }
   }
+
   if (is_char_key(scan_code)) {
     // print character or string corresponding to received keycode; only print chars when not \0
     if (key_state.key != L'\0') {
       sprintf(out, "%lc", key_state.key);
     }
-  }
-  else if (is_func_key(scan_code)) {
+  } else if (is_func_key(scan_code)) {
     if (!(args.flags & FLAG_NO_FUNC_KEYS)) {  // only display function keys if --no-func-keys not requested
       sprintf(out, "%ls", func_keys[to_func_keys_index(scan_code)]);
-    }
-    else if (scan_code == KEY_SPACE) {
-      sprintf(out, "␣");  // but always display a single space for Space and Tab keys
-    }
-    else if (scan_code == KEY_TAB) {
-      sprintf(out, "⇥");  // but always display a single space for Space and Tab keys
     }
   } else {
     sprintf(out, "<E-%x>", scan_code);  // keycode is neither of character nor function, display in error format
